@@ -1,0 +1,5 @@
+.venv
+*.pyc
+.pytest_cache
+.direnv
+beanslash.egg-info

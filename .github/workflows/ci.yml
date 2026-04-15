@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v16
+
+      - uses: DeterminateSystems/magic-nix-cache-action@v2
+
+      - name: Install dependencies
+        run: nix develop --command uv sync --group dev
+
+      - name: Lint with ruff
+        run: nix develop --command uv run ruff check .
+
+      - name: Format check with ruff
+        run: nix develop --command uv run ruff format --check .
+
+      - name: Run tests
+        run: nix develop --command uv run pytest

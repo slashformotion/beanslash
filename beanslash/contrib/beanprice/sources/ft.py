@@ -8,19 +8,35 @@ __copyright__ = "Copyright (C) 2026  Roman Medvedev"
 __license__ = "GNU GPLv2"
 
 import datetime
-from decimal import Decimal
 import json
 import re
-import urllib.request
-import urllib.parse
+import ssl
 import urllib.error
-from typing import List, Optional, Dict, Any
+import urllib.parse
+import urllib.request
+from decimal import Decimal
+from typing import Any, Dict, List, Optional
 
+import certifi
 from beanprice import source
 
 
 class FTError(ValueError):
     """An error from the FT source."""
+
+
+def _ssl_context() -> ssl.SSLContext:
+    """Return an SSL context with a working CA trust store.
+
+    Some Python distributions (e.g. uv-managed standalone builds on NixOS)
+    ship with an empty default trust store and fail TLS verification with
+    "unable to get local issuer certificate". Fall back to certifi's CA
+    bundle in that case.
+    """
+    context = ssl.create_default_context()
+    if not context.get_ca_certs():
+        context.load_verify_locations(certifi.where())
+    return context
 
 
 _USER_AGENT = (
@@ -41,7 +57,7 @@ def get_url(url: str, params: Optional[Dict[str, Any]] = None) -> str:
     }
     req = urllib.request.Request(url, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=10) as response:
+        with urllib.request.urlopen(req, timeout=10, context=_ssl_context()) as response:
             return response.read().decode("utf-8")
     except urllib.error.URLError as exc:
         raise FTError(f"Network error fetching {url}: {exc}") from exc
@@ -57,7 +73,9 @@ def post_json(url: str, data: Dict[str, Any]) -> str:
     body = json.dumps(data).encode("utf-8")
     req = urllib.request.Request(url, data=body, headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=10) as response:
+        with urllib.request.urlopen(
+            req, timeout=10, context=_ssl_context()
+        ) as response:
             return response.read().decode("utf-8")
     except urllib.error.URLError as exc:
         raise FTError(f"Network error posting to {url}: {exc}") from exc
